@@ -54,7 +54,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"imported {result.symbol} {result.market} {result.interval} -> {result.parquet_path}")
         return 0
     if args.command == "validate":
-        raise SystemExit(f"command {args.command!r} is not implemented")
+        from hushine_strategy.validator import validate_strategy_code
+
+        strategy_path = Path(args.strategy_file)
+        result = validate_strategy_code(strategy_path.read_text(encoding="utf-8"))
+        if result.ok:
+            print("validation ok")
+            return 0
+        for issue in result.issues:
+            where = f":{issue.line}" if issue.line else ""
+            detail = issue.module or issue.symbol
+            suffix = f" ({detail})" if detail else ""
+            print(f"{issue.code}{where}: {issue.message}{suffix}")
+        return 1
     parser.print_help()
     return 2
 

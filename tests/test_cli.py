@@ -38,6 +38,51 @@ def test_repair_command_restores_workspace(tmp_path, capsys):
     assert "initial_balance: 5000.0" in (workspace / "wallet.yaml").read_text(encoding="utf-8")
 
 
+def test_validate_command_accepts_clean_strategy(tmp_path, capsys):
+    strategy = tmp_path / "strategy.py"
+    strategy.write_text(
+        """
+from hushine_strategy import OrderDecision
+
+class MyStrategy:
+    INPUTS = [{"market": "futures", "symbol": "BTCUSDT", "interval": "1m"}]
+
+    def on_market_data(self, data, wallet):
+        return None
+""",
+        encoding="utf-8",
+    )
+
+    code = main(["validate", str(strategy)])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "validation ok" in captured.out
+
+
+def test_validate_command_rejects_forbidden_import(tmp_path, capsys):
+    strategy = tmp_path / "strategy.py"
+    strategy.write_text(
+        """
+import requests
+
+class MyStrategy:
+    INPUTS = [{"market": "futures", "symbol": "BTCUSDT", "interval": "1m"}]
+
+    def on_market_data(self, data, wallet):
+        return None
+""",
+        encoding="utf-8",
+    )
+
+    code = main(["validate", str(strategy)])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "forbidden_import" in captured.out
+    assert "requests" in captured.out
+
+
 def test_module_entrypoint_creates_workspace(tmp_path):
     workspace = tmp_path / "module-workspace"
     env = dict(os.environ)
