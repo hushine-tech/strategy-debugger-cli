@@ -7,8 +7,51 @@ from hushine_strategy.replay.engine import ReplayConfig, ReplayResult, run_repla
 from hushine_strategy.wallet.futures import FuturesWallet
 
 from hushine_debugger.config import load_config, load_initial_balance
-from hushine_debugger.data.parquet_store import load_klines
+from hushine_debugger.data.parquet_store import DataCoverageError, load_klines
+from hushine_debugger.downloader.binance_futures import download_klines, interval_to_ms, save_to_cache
 from hushine_debugger.integrity import check_workspace_integrity
+
+
+def _load_or_download_klines(workspace: Path, cfg):
+    try:
+        interval_ms = interval_to_ms(cfg.interval) if cfg.start_time_ms is not None and cfg.end_time_ms is not None else None
+        return load_klines(
+            workspace,
+            symbol=cfg.symbol,
+            market=cfg.market,
+            interval=cfg.interval,
+            data_source_order=cfg.data_source_order,
+            data_files=cfg.data_files,
+            start_time_ms=cfg.start_time_ms,
+            end_time_ms=cfg.end_time_ms,
+            interval_ms=interval_ms,
+        )
+    except (FileNotFoundError, DataCoverageError):
+        if cfg.data_files or not cfg.download_if_missing:
+            raise
+        if cfg.exchange != "binance" or cfg.market != "futures":
+            raise
+        if cfg.start_time_ms is None or cfg.end_time_ms is None:
+            raise FileNotFoundError("missing local data and config start/end are required for download")
+        frame = download_klines(
+            symbol=cfg.symbol,
+            interval=cfg.interval,
+            start_ms=cfg.start_time_ms,
+            end_ms=cfg.end_time_ms,
+        )
+        if frame.empty:
+            raise FileNotFoundError(f"download returned no kline data for {cfg.market} {cfg.symbol} {cfg.interval}")
+        save_to_cache(workspace, frame, symbol=cfg.symbol, interval=cfg.interval)
+        return load_klines(
+            workspace,
+            symbol=cfg.symbol,
+            market=cfg.market,
+            interval=cfg.interval,
+            data_source_order=("cache",),
+            start_time_ms=cfg.start_time_ms,
+            end_time_ms=cfg.end_time_ms,
+            interval_ms=interval_to_ms(cfg.interval),
+        )
 
 
 def replay_workspace(root: str | Path = ".") -> ReplayResult:
@@ -21,16 +64,7 @@ def replay_workspace(root: str | Path = ".") -> ReplayResult:
     strategy_path = workspace / cfg.strategy_file
     if not strategy_path.exists():
         raise FileNotFoundError("strategy.py not found; copy strategy.py.template to strategy.py first")
-    ticks = load_klines(
-        workspace,
-        symbol=cfg.symbol,
-        market=cfg.market,
-        interval=cfg.interval,
-        data_source_order=cfg.data_source_order,
-        data_files=cfg.data_files,
-        start_time_ms=cfg.start_time_ms,
-        end_time_ms=cfg.end_time_ms,
-    )
+    ticks = _load_or_download_klines(workspace, cfg)
     wallet = FuturesWallet(initial_balance=load_initial_balance(workspace))
     return run_replay(
         ReplayConfig(

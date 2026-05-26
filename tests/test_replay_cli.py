@@ -11,6 +11,19 @@ from hushine_debugger.replay import replay_workspace
 
 def _write_minimal_workspace(root: Path) -> None:
     init_workspace(root)
+    (root / "hushine-debug.yaml").write_text(
+        "strategy_file: strategy.py\n"
+        "exchange: binance\n"
+        "market: futures\n"
+        "symbol: BTCUSDT\n"
+        "interval: 1m\n"
+        "start: '2025-01-01T00:00:00Z'\n"
+        "end: '2025-01-01T00:02:00Z'\n"
+        "data_source_order:\n"
+        "  - bundled\n"
+        "download_if_missing: false\n",
+        encoding="utf-8",
+    )
     (root / "strategy.py").write_text(
         (root / "strategy.py.template").read_text(encoding="utf-8"),
         encoding="utf-8",
@@ -242,6 +255,189 @@ def test_replay_filters_configured_time_range(tmp_path: Path):
     result = replay_workspace(tmp_path)
 
     assert result.bars_processed == 2
+
+
+def test_replay_downloads_missing_binance_futures_data(tmp_path: Path, monkeypatch):
+    init_workspace(tmp_path)
+    (tmp_path / "strategy.py").write_text(
+        "class MyStrategy:\n"
+        "    INPUTS = [{'market': 'futures', 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    def on_market_data(self, data, wallet):\n"
+        "        return None\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "hushine-debug.yaml").write_text(
+        "strategy_file: strategy.py\n"
+        "exchange: binance\n"
+        "market: futures\n"
+        "symbol: BTCUSDT\n"
+        "interval: 1m\n"
+        "start: '2025-01-01T00:00:00Z'\n"
+        "end: '2025-01-01T00:02:00Z'\n"
+        "data_source_order:\n"
+        "  - cache\n"
+        "download_if_missing: true\n",
+        encoding="utf-8",
+    )
+
+    def fake_download_klines(*, symbol, interval, start_ms, end_ms):
+        assert symbol == "BTCUSDT"
+        assert interval == "1m"
+        assert start_ms == 1735689600000
+        assert end_ms == 1735689720000
+        return pd.DataFrame(
+            [
+                {
+                    "timestamp": 1735689600000,
+                    "open": 100.0,
+                    "high": 101.0,
+                    "low": 99.0,
+                    "close": 100.0,
+                    "volume": 10.0,
+                    "symbol": "BTCUSDT",
+                    "market": "futures",
+                    "interval": "1m",
+                },
+                {
+                    "timestamp": 1735689660000,
+                    "open": 101.0,
+                    "high": 102.0,
+                    "low": 100.0,
+                    "close": 101.0,
+                    "volume": 11.0,
+                    "symbol": "BTCUSDT",
+                    "market": "futures",
+                    "interval": "1m",
+                },
+            ]
+        )
+
+    monkeypatch.setattr("hushine_debugger.replay.download_klines", fake_download_klines)
+
+    result = replay_workspace(tmp_path)
+
+    assert result.bars_processed == 2
+    assert (tmp_path / "data" / "cache" / "binance" / "futures" / "1m" / "BTCUSDT" / "klines.parquet").exists()
+
+
+def test_replay_downloads_when_local_cache_has_partial_range(tmp_path: Path, monkeypatch):
+    init_workspace(tmp_path)
+    (tmp_path / "strategy.py").write_text(
+        "class MyStrategy:\n"
+        "    INPUTS = [{'market': 'futures', 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    def on_market_data(self, data, wallet):\n"
+        "        return None\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "hushine-debug.yaml").write_text(
+        "strategy_file: strategy.py\n"
+        "exchange: binance\n"
+        "market: futures\n"
+        "symbol: BTCUSDT\n"
+        "interval: 1m\n"
+        "start: '2025-01-01T00:00:00Z'\n"
+        "end: '2025-01-01T00:03:00Z'\n"
+        "data_source_order:\n"
+        "  - cache\n"
+        "download_if_missing: true\n",
+        encoding="utf-8",
+    )
+    partial = pd.DataFrame(
+        [
+            {
+                "timestamp": 1735689600000,
+                "open": 100.0,
+                "high": 101.0,
+                "low": 99.0,
+                "close": 100.0,
+                "volume": 10.0,
+                "symbol": "BTCUSDT",
+                "market": "futures",
+                "interval": "1m",
+            }
+        ]
+    )
+    cache_path = tmp_path / "data" / "cache" / "binance" / "futures" / "1m" / "BTCUSDT"
+    cache_path.mkdir(parents=True)
+    partial.to_parquet(cache_path / "klines.parquet")
+
+    def fake_download_klines(*, symbol, interval, start_ms, end_ms):
+        return pd.DataFrame(
+            [
+                {
+                    "timestamp": 1735689600000 + i * 60_000,
+                    "open": 100.0 + i,
+                    "high": 101.0 + i,
+                    "low": 99.0 + i,
+                    "close": 100.0 + i,
+                    "volume": 10.0 + i,
+                    "symbol": symbol,
+                    "market": "futures",
+                    "interval": interval,
+                }
+                for i in range(3)
+            ]
+        )
+
+    monkeypatch.setattr("hushine_debugger.replay.download_klines", fake_download_klines)
+
+    result = replay_workspace(tmp_path)
+
+    assert result.bars_processed == 3
+    merged = pd.read_parquet(cache_path / "klines.parquet")
+    assert merged["timestamp"].tolist() == [1735689600000, 1735689660000, 1735689720000]
+
+
+def test_replay_uses_later_complete_cache_when_bundled_is_partial(tmp_path: Path, monkeypatch):
+    init_workspace(tmp_path)
+    (tmp_path / "strategy.py").write_text(
+        "class MyStrategy:\n"
+        "    INPUTS = [{'market': 'futures', 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    def on_market_data(self, data, wallet):\n"
+        "        return None\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "hushine-debug.yaml").write_text(
+        "strategy_file: strategy.py\n"
+        "exchange: binance\n"
+        "market: futures\n"
+        "symbol: BTCUSDT\n"
+        "interval: 1m\n"
+        "start: '2025-01-01T00:00:00Z'\n"
+        "end: '2025-01-01T00:03:00Z'\n"
+        "data_source_order:\n"
+        "  - bundled\n"
+        "  - cache\n"
+        "download_if_missing: true\n",
+        encoding="utf-8",
+    )
+    rows = [
+        {
+            "timestamp": 1735689600000 + i * 60_000,
+            "open": 100.0 + i,
+            "high": 101.0 + i,
+            "low": 99.0 + i,
+            "close": 100.0 + i,
+            "volume": 10.0 + i,
+            "symbol": "BTCUSDT",
+            "market": "futures",
+            "interval": "1m",
+        }
+        for i in range(3)
+    ]
+    pd.DataFrame(rows[:1]).to_parquet(tmp_path / "data" / "bundled" / "partial.parquet")
+    cache_dir = tmp_path / "data" / "cache" / "binance" / "futures" / "1m" / "BTCUSDT"
+    cache_dir.mkdir(parents=True)
+    pd.DataFrame(rows).to_parquet(cache_dir / "klines.parquet")
+
+    def fail_download(**kwargs):
+        raise AssertionError("complete cache should be used before downloading")
+
+    monkeypatch.setattr("hushine_debugger.replay.download_klines", fail_download)
+
+    result = replay_workspace(tmp_path)
+
+    assert result.bars_processed == 3
 
 
 def _write_debug_package(package_path: Path, *, manifest: str, wallet: str, source: pd.DataFrame) -> None:

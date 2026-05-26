@@ -7,6 +7,10 @@ import pandas as pd
 from hushine_strategy import MarketData
 
 
+class DataCoverageError(FileNotFoundError):
+    pass
+
+
 def _matching_klines(section_path: Path, *, symbol: str, market: str, interval: str) -> pd.DataFrame | None:
     frames = []
     for path in section_path.rglob("*.parquet"):
@@ -48,6 +52,23 @@ def _apply_time_filter(df: pd.DataFrame, *, start_time_ms: int | None, end_time_
     return df
 
 
+def _assert_contiguous_coverage(
+    df: pd.DataFrame,
+    *,
+    start_time_ms: int | None,
+    end_time_ms: int | None,
+    interval_ms: int | None,
+) -> None:
+    if start_time_ms is None or end_time_ms is None or interval_ms is None:
+        return
+    expected = list(range(start_time_ms, end_time_ms, interval_ms))
+    actual = df["timestamp"].astype(int).drop_duplicates().sort_values().tolist()
+    if actual != expected:
+        raise DataCoverageError(
+            f"kline coverage is incomplete: expected {len(expected)} bars from {start_time_ms} to {end_time_ms}, got {len(actual)}"
+        )
+
+
 def load_klines(
     root: str | Path,
     *,
@@ -58,6 +79,7 @@ def load_klines(
     data_files: tuple[str, ...] = (),
     start_time_ms: int | None = None,
     end_time_ms: int | None = None,
+    interval_ms: int | None = None,
 ) -> list[MarketData]:
     base = Path(root) / "data"
     workspace = Path(root)
@@ -68,8 +90,10 @@ def load_klines(
         df = _apply_time_filter(df, start_time_ms=start_time_ms, end_time_ms=end_time_ms)
         if df.empty:
             raise FileNotFoundError(f"configured data files have no rows in requested time range for {market} {symbol} {interval}")
+        _assert_contiguous_coverage(df, start_time_ms=start_time_ms, end_time_ms=end_time_ms, interval_ms=interval_ms)
         return _rows_to_market_data(df)
     checked: list[str] = []
+    coverage_error: DataCoverageError | None = None
     for section in data_source_order:
         section_name = str(section).strip()
         if not section_name:
@@ -80,8 +104,20 @@ def load_klines(
             df = _apply_time_filter(df, start_time_ms=start_time_ms, end_time_ms=end_time_ms)
             if df.empty:
                 continue
+            try:
+                _assert_contiguous_coverage(
+                    df,
+                    start_time_ms=start_time_ms,
+                    end_time_ms=end_time_ms,
+                    interval_ms=interval_ms,
+                )
+            except DataCoverageError as exc:
+                coverage_error = exc
+                continue
             break
     else:
+        if coverage_error is not None:
+            raise coverage_error
         locations = ", ".join(f"data/{section}" for section in checked or data_source_order)
         raise FileNotFoundError(f"no kline data for {market} {symbol} {interval} in {locations}")
     return _rows_to_market_data(df)
