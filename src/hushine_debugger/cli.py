@@ -39,7 +39,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         repair_workspace(Path(args.dir))
         print(f"repaired {args.dir}")
         return 0
-    if args.command in {"replay", "validate", "import"}:
+    if args.command == "replay":
+        from hushine_debugger.replay import replay_workspace
+
+        result = replay_workspace(Path("."))
+        print(f"bars_processed={result.bars_processed} orders_filled={result.orders_filled}")
+        return 0
+    if args.command == "import":
+        if not args.package:
+            raise SystemExit("debug package path is required")
+        from hushine_debugger.import_package import import_debug_package
+
+        result = import_debug_package(args.package, Path("."))
+        print(f"imported {result.symbol} {result.market} {result.interval} -> {result.parquet_path}")
+        return 0
+    if args.command == "validate":
         raise SystemExit(f"command {args.command!r} is not implemented")
     parser.print_help()
     return 2
