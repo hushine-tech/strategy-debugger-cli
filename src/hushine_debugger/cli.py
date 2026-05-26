@@ -46,6 +46,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         from hushine_debugger.replay import replay_workspace
 
         result = replay_workspace(Path("."))
+        print("Backtest completed")
+        print(f"Bars processed: {result.bars_processed}")
+        print(f"Orders filled: {result.orders_filled}")
+        print(f"Initial balance: {result.initial_balance:.2f} USDT")
+        print(f"Final equity: {result.final_equity:.2f} USDT")
+        print(f"PnL: {result.pnl:+.2f} USDT")
+        print(f"Return: {result.return_pct:+.2f}%")
         print(f"bars_processed={result.bars_processed} orders_filled={result.orders_filled}")
         return 0
     if args.command == "import":

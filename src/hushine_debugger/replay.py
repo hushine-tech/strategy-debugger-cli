@@ -1,15 +1,26 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from hushine_strategy.notifier import LocalNotifier
-from hushine_strategy.replay.engine import ReplayConfig, ReplayResult, run_replay
+from hushine_strategy.replay.engine import ReplayConfig, run_replay
 from hushine_strategy.wallet.futures import FuturesWallet
 
 from hushine_debugger.config import load_config, load_initial_balance
 from hushine_debugger.data.parquet_store import DataCoverageError, load_klines
 from hushine_debugger.downloader.binance_futures import download_klines, interval_to_ms, save_to_cache
 from hushine_debugger.integrity import check_workspace_integrity
+
+
+@dataclass(frozen=True)
+class LocalReplayResult:
+    bars_processed: int
+    orders_filled: int
+    initial_balance: float
+    final_equity: float
+    pnl: float
+    return_pct: float
 
 
 def _load_or_download_klines(workspace: Path, cfg):
@@ -64,7 +75,33 @@ def _load_or_download_klines(workspace: Path, cfg):
         )
 
 
-def replay_workspace(root: str | Path = ".") -> ReplayResult:
+def _with_progress(ticks):
+    total = len(ticks)
+    next_threshold = 10
+    for index, tick in enumerate(ticks, 1):
+        if total > 0:
+            percent = int(index * 100 / total)
+            while percent >= next_threshold and next_threshold <= 100:
+                print(f"Progress: {next_threshold}% ({index}/{total} bars)", flush=True)
+                next_threshold += 10
+        yield tick
+
+
+def _final_equity(wallet: FuturesWallet, symbols: set[str]) -> float:
+    equity = float(wallet.wallet_balance)
+    for symbol in symbols:
+        qty = float(wallet.position_qty(symbol))
+        if qty == 0:
+            continue
+        mark = wallet.mark_price(symbol)
+        if mark is None:
+            continue
+        entry = float(wallet.position_entry_price(symbol))
+        equity += (float(mark) - entry) * qty
+    return equity
+
+
+def replay_workspace(root: str | Path = ".") -> LocalReplayResult:
     workspace = Path(root)
     integrity = check_workspace_integrity(workspace)
     if not integrity.ok:
@@ -75,13 +112,27 @@ def replay_workspace(root: str | Path = ".") -> ReplayResult:
     if not strategy_path.exists():
         raise FileNotFoundError("strategy.py not found; copy strategy.py.template to strategy.py first")
     ticks = _load_or_download_klines(workspace, cfg)
-    wallet = FuturesWallet(initial_balance=load_initial_balance(workspace))
-    return run_replay(
+    symbols = {str(tick.symbol).upper() for tick in ticks}
+    initial_balance = load_initial_balance(workspace)
+    wallet = FuturesWallet(initial_balance=initial_balance)
+    print(f"Running backtest {cfg.symbol} {cfg.market} {cfg.interval}", flush=True)
+    result = run_replay(
         ReplayConfig(
             strategy_code=strategy_path.read_text(encoding="utf-8"),
-            ticks=ticks,
+            ticks=_with_progress(ticks),
             wallet=wallet,
             strategy_path=str(strategy_path),
             notifier=LocalNotifier(workspace / "logs" / "notifications.log"),
         )
+    )
+    final_equity = _final_equity(wallet, symbols)
+    pnl = final_equity - initial_balance
+    return_pct = 0.0 if initial_balance == 0 else pnl / initial_balance * 100
+    return LocalReplayResult(
+        bars_processed=result.bars_processed,
+        orders_filled=result.orders_filled,
+        initial_balance=round(initial_balance, 8),
+        final_equity=round(final_equity, 8),
+        pnl=round(pnl, 8),
+        return_pct=round(return_pct, 8),
     )

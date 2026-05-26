@@ -58,6 +58,62 @@ def _write_minimal_workspace(root: Path) -> None:
     df.to_parquet(data_dir / "binance_futures_1m_2025_01.parquet")
 
 
+def _write_pnl_workspace(root: Path) -> None:
+    init_workspace(root)
+    (root / "hushine-debug.yaml").write_text(
+        "strategy_file: strategy.py\n"
+        "exchange: binance\n"
+        "market: futures\n"
+        "symbol: TESTUSDT\n"
+        "interval: 1m\n"
+        "start: '2025-03-01T00:00:00Z'\n"
+        "end: '2025-03-01T00:02:00Z'\n"
+        "data_source_order:\n"
+        "  - bundled\n"
+        "download_if_missing: false\n",
+        encoding="utf-8",
+    )
+    (root / "strategy.py").write_text(
+        "from hushine_strategy import OrderDecision\n\n"
+        "class MyStrategy:\n"
+        "    INPUTS = [{'market': 'futures', 'symbol': 'TESTUSDT', 'interval': '1m'}]\n"
+        "    def __init__(self):\n"
+        "        self.done = False\n"
+        "    def on_market_data(self, data, wallet):\n"
+        "        if not self.done:\n"
+        "            self.done = True\n"
+        "            return OrderDecision(symbol='TESTUSDT', side='LONG', qty=1, market='futures')\n"
+        "        return None\n",
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "timestamp": 1740787200000,
+                "open": 100.0,
+                "high": 100.0,
+                "low": 100.0,
+                "close": 100.0,
+                "volume": 10.0,
+                "symbol": "TESTUSDT",
+                "market": "futures",
+                "interval": "1m",
+            },
+            {
+                "timestamp": 1740787260000,
+                "open": 110.0,
+                "high": 110.0,
+                "low": 110.0,
+                "close": 110.0,
+                "volume": 11.0,
+                "symbol": "TESTUSDT",
+                "market": "futures",
+                "interval": "1m",
+            },
+        ]
+    ).to_parquet(root / "data" / "bundled" / "testusdt.parquet")
+
+
 def test_replay_workspace_uses_strategy_and_local_parquet(tmp_path: Path):
     _write_minimal_workspace(tmp_path)
     result = replay_workspace(tmp_path)
@@ -75,6 +131,35 @@ def test_replay_command_outputs_summary(tmp_path: Path, monkeypatch, capsys):
     assert code == 0
     assert "bars_processed=2" in captured.out
     assert "orders_filled=" in captured.out
+
+
+def test_replay_result_includes_pnl_and_return(tmp_path: Path):
+    _write_pnl_workspace(tmp_path)
+
+    result = replay_workspace(tmp_path)
+
+    assert result.bars_processed == 2
+    assert result.orders_filled == 1
+    assert result.initial_balance == 1000.0
+    assert result.final_equity == 1010.0
+    assert result.pnl == 10.0
+    assert result.return_pct == 1.0
+
+
+def test_replay_command_outputs_progress_and_pnl_summary(tmp_path: Path, monkeypatch, capsys):
+    _write_pnl_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    code = main(["replay"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "Running backtest TESTUSDT futures 1m" in captured.out
+    assert "Progress: 100%" in captured.out
+    assert "Initial balance: 1000.00 USDT" in captured.out
+    assert "Final equity: 1010.00 USDT" in captured.out
+    assert "PnL: +10.00 USDT" in captured.out
+    assert "Return: +1.00%" in captured.out
 
 
 def test_replay_requires_user_strategy_file(tmp_path: Path):
