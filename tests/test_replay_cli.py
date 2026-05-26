@@ -79,12 +79,22 @@ def test_replay_command_outputs_summary(tmp_path: Path, monkeypatch, capsys):
 
 def test_replay_requires_user_strategy_file(tmp_path: Path):
     init_workspace(tmp_path)
+    (tmp_path / "strategy.py").unlink()
     try:
         replay_workspace(tmp_path)
     except FileNotFoundError as exc:
         assert "copy strategy.py.template to strategy.py first" in str(exc)
     else:
         raise AssertionError("replay should require strategy.py")
+
+
+def test_init_workspace_does_not_overwrite_user_strategy(tmp_path: Path):
+    init_workspace(tmp_path)
+    (tmp_path / "strategy.py").write_text("class MyStrategy:\n    pass\n", encoding="utf-8")
+
+    init_workspace(tmp_path)
+
+    assert (tmp_path / "strategy.py").read_text(encoding="utf-8") == "class MyStrategy:\n    pass\n"
 
 
 def test_import_command_unpacks_debug_package(tmp_path: Path, monkeypatch, capsys):
@@ -257,7 +267,7 @@ def test_replay_filters_configured_time_range(tmp_path: Path):
     assert result.bars_processed == 2
 
 
-def test_replay_downloads_missing_binance_futures_data(tmp_path: Path, monkeypatch):
+def test_replay_downloads_missing_binance_futures_data(tmp_path: Path, monkeypatch, capsys):
     init_workspace(tmp_path)
     (tmp_path / "strategy.py").write_text(
         "class MyStrategy:\n"
@@ -280,11 +290,18 @@ def test_replay_downloads_missing_binance_futures_data(tmp_path: Path, monkeypat
         encoding="utf-8",
     )
 
-    def fake_download_klines(*, symbol, interval, start_ms, end_ms):
+    def fake_download_klines(*, symbol, interval, start_ms, end_ms, on_progress=None):
         assert symbol == "BTCUSDT"
         assert interval == "1m"
         assert start_ms == 1735689600000
         assert end_ms == 1735689720000
+        if on_progress is not None:
+            class Event:
+                downloaded_bars = 2
+                expected_bars = 2
+                percent = 100.0
+
+            on_progress(Event())
         return pd.DataFrame(
             [
                 {
@@ -316,7 +333,10 @@ def test_replay_downloads_missing_binance_futures_data(tmp_path: Path, monkeypat
 
     result = replay_workspace(tmp_path)
 
+    captured = capsys.readouterr()
     assert result.bars_processed == 2
+    assert "Local data missing, downloading BTCUSDT futures 1m" in captured.out
+    assert "Download completed" in captured.out
     assert (tmp_path / "data" / "cache" / "binance" / "futures" / "1m" / "BTCUSDT" / "klines.parquet").exists()
 
 
@@ -361,7 +381,7 @@ def test_replay_downloads_when_local_cache_has_partial_range(tmp_path: Path, mon
     cache_path.mkdir(parents=True)
     partial.to_parquet(cache_path / "klines.parquet")
 
-    def fake_download_klines(*, symbol, interval, start_ms, end_ms):
+    def fake_download_klines(*, symbol, interval, start_ms, end_ms, on_progress=None):
         return pd.DataFrame(
             [
                 {
@@ -438,6 +458,20 @@ def test_replay_uses_later_complete_cache_when_bundled_is_partial(tmp_path: Path
     result = replay_workspace(tmp_path)
 
     assert result.bars_processed == 3
+
+
+def test_packaged_default_data_contains_required_symbols():
+    from importlib.resources import files
+
+    required = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
+    root = files("hushine_debugger.assets.default_data") / "binance" / "futures" / "1m"
+    for symbol in required:
+        path = root / symbol / "klines.parquet"
+        assert path.is_file(), symbol
+        df = pd.read_parquet(path)
+        assert len(df) == 44640
+        assert df["timestamp"].min() == 1735689600000
+        assert df["timestamp"].max() == 1738367940000
 
 
 def _write_debug_package(package_path: Path, *, manifest: str, wallet: str, source: pd.DataFrame) -> None:

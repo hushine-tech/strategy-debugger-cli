@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -19,8 +20,26 @@ def test_init_command_creates_workspace(tmp_path, capsys):
     captured = capsys.readouterr()
     assert code == 0
     assert f"initialized {workspace}" in captured.out
+    assert (workspace / "strategy.py").exists()
     assert (workspace / "strategy.py.template").exists()
     assert (workspace / ".vscode" / "launch.json").exists()
+    launch = json.loads((workspace / ".vscode" / "launch.json").read_text(encoding="utf-8"))
+    config = launch["configurations"][0]
+    assert config["python"] == "${workspaceFolder}/.venv/bin/python"
+    assert config["module"] == "hushine_debugger.cli"
+    assert config["args"] == ["replay"]
+    assert (workspace / "data" / "bundled").exists()
+
+
+def test_init_command_with_demo_prints_ready_message(tmp_path, capsys):
+    workspace = tmp_path / "debug-workspace"
+
+    code = main(["init", "--dir", str(workspace), "--with-demo"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert f"initialized {workspace}" in captured.out
+    assert "demo workspace ready" in captured.out
 
 
 def test_repair_command_restores_workspace(tmp_path, capsys):
@@ -98,3 +117,14 @@ def test_module_entrypoint_creates_workspace(tmp_path):
     assert result.returncode == 0
     assert f"initialized {workspace}" in result.stdout
     assert (workspace / "hushine-debug.yaml").exists()
+
+
+def test_repo_init_script_exists():
+    script = Path(__file__).resolve().parents[1] / "init"
+
+    assert script.exists()
+    text = script.read_text(encoding="utf-8")
+    assert "python -m venv" in text
+    assert "pip install" in text
+    assert "hushine_debugger.cli" in text
+    assert "Demo completed" in text

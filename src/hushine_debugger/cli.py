@@ -15,6 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
     init = sub.add_parser("init")
     init.add_argument("--dir", default="hushine-debug-workspace")
+    init.add_argument("--with-demo", action="store_true")
     sub.add_parser("replay")
     validate = sub.add_parser("validate")
     validate.add_argument("strategy_file", nargs="?", default="strategy.py")
@@ -34,6 +35,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "init":
         init_workspace(Path(args.dir))
         print(f"initialized {args.dir}")
+        if args.with_demo:
+            print("demo workspace ready")
         return 0
     if args.command == "repair":
         repair_workspace(Path(args.dir))

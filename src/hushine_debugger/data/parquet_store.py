@@ -23,6 +23,7 @@ def _matching_klines(section_path: Path, *, symbol: str, market: str, interval: 
         & (df["market"].str.lower() == market.lower())
         & (df["interval"].astype(str) == interval)
     ].sort_values("timestamp")
+    df = df.drop_duplicates(subset=["timestamp", "symbol", "market", "interval"], keep="last")
     return df if not df.empty else None
 
 
@@ -41,6 +42,7 @@ def _load_files(root: Path, files: tuple[str, ...], *, symbol: str, market: str,
         & (df["market"].str.lower() == market.lower())
         & (df["interval"].astype(str) == interval)
     ].sort_values("timestamp")
+    df = df.drop_duplicates(subset=["timestamp", "symbol", "market", "interval"], keep="last")
     return df if not df.empty else None
 
 

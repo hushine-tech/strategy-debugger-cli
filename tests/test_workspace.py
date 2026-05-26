@@ -4,10 +4,10 @@ from hushine_debugger.init_workspace import init_workspace
 from hushine_debugger.integrity import check_workspace_integrity, repair_workspace
 
 
-def test_init_writes_template_without_strategy_py(tmp_path: Path):
+def test_init_writes_template_and_strategy_py(tmp_path: Path):
     init_workspace(tmp_path)
     assert (tmp_path / "strategy.py.template").exists()
-    assert not (tmp_path / "strategy.py").exists()
+    assert (tmp_path / "strategy.py").exists()
     assert (tmp_path / ".hushine" / "manifest.lock").exists()
 
 

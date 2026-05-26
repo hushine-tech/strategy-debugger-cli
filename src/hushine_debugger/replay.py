@@ -33,15 +33,25 @@ def _load_or_download_klines(workspace: Path, cfg):
             raise
         if cfg.start_time_ms is None or cfg.end_time_ms is None:
             raise FileNotFoundError("missing local data and config start/end are required for download")
+        print(f"Local data missing, downloading {cfg.symbol} {cfg.market} {cfg.interval}...", flush=True)
+
+        def report_progress(event) -> None:
+            print(
+                f"Downloaded {event.downloaded_bars}/{event.expected_bars} bars ({event.percent:.1f}%)",
+                flush=True,
+            )
+
         frame = download_klines(
             symbol=cfg.symbol,
             interval=cfg.interval,
             start_ms=cfg.start_time_ms,
             end_ms=cfg.end_time_ms,
+            on_progress=report_progress,
         )
         if frame.empty:
             raise FileNotFoundError(f"download returned no kline data for {cfg.market} {cfg.symbol} {cfg.interval}")
         save_to_cache(workspace, frame, symbol=cfg.symbol, interval=cfg.interval)
+        print("Download completed, replay starting...", flush=True)
         return load_klines(
             workspace,
             symbol=cfg.symbol,

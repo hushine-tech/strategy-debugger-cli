@@ -53,6 +53,25 @@ def test_download_klines_uses_injected_session():
     assert session.calls[0][1]["limit"] == 1500
 
 
+def test_download_klines_reports_progress():
+    session = _FakeSession()
+    events = []
+    df = download_klines(
+        symbol="BTCUSDT",
+        interval="1m",
+        start_ms=1735689600000,
+        end_ms=1735689720000,
+        session=session,
+        on_progress=events.append,
+    )
+
+    assert len(df) == 2
+    assert events
+    assert events[-1].downloaded_bars == 2
+    assert events[-1].expected_bars == 2
+    assert events[-1].percent == 100.0
+
+
 def test_save_to_cache_writes_parquet(tmp_path):
     df = pd.DataFrame(
         [

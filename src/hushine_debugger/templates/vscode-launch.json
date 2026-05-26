@@ -5,9 +5,13 @@
       "name": "Hushine Local Replay",
       "type": "debugpy",
       "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "module": "hushine_debugger.cli",
       "args": ["replay"],
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
     }
   ]
 }

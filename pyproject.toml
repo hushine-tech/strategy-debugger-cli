@@ -33,5 +33,5 @@ include = ["hushine_debugger*"]
 [tool.setuptools.package-data]
 hushine_debugger = [
   "templates/*",
-  "assets/default_data/*"
+  "assets/default_data/**/*"
 ]

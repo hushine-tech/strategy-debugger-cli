@@ -5,6 +5,8 @@ import json
 from importlib.resources import files
 from pathlib import Path
 
+from hushine_debugger.demo_data import copy_default_data
+
 
 MANAGED_FILES = [
     "strategy.py.template",
@@ -65,4 +67,8 @@ def init_workspace(path: str | Path) -> None:
             data = _template_bytes(rel)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
+    strategy_file = root / "strategy.py"
+    if not strategy_file.exists():
+        strategy_file.write_bytes(_template_bytes("strategy.py.template"))
+    copy_default_data(root)
     write_manifest(root)

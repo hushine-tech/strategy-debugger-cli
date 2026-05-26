@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Callable, Protocol
 
 import pandas as pd
 import requests
@@ -14,6 +15,18 @@ COLUMNS = ["timestamp", "open", "high", "low", "close", "volume", "symbol", "mar
 class HTTPSession(Protocol):
     def get(self, url: str, *, params: dict, timeout: int):
         ...
+
+
+@dataclass(frozen=True)
+class DownloadProgress:
+    symbol: str
+    interval: str
+    start_ms: int
+    end_ms: int
+    cursor_ms: int
+    downloaded_bars: int
+    expected_bars: int
+    percent: float
 
 
 def interval_to_ms(interval: str) -> int:
@@ -59,11 +72,13 @@ def download_klines(
     start_ms: int,
     end_ms: int,
     session: HTTPSession | None = None,
+    on_progress: Callable[[DownloadProgress], None] | None = None,
 ) -> pd.DataFrame:
     client = session or requests
     rows: list[pd.DataFrame] = []
     cursor = int(start_ms)
     step_ms = interval_to_ms(interval)
+    expected_bars = max(0, (int(end_ms) - int(start_ms)) // step_ms)
     while cursor < int(end_ms):
         resp = client.get(
             BASE_URL,
@@ -86,6 +101,21 @@ def download_klines(
         if next_cursor <= cursor:
             break
         cursor = next_cursor
+        if on_progress is not None:
+            downloaded_bars = sum(len(chunk) for chunk in rows)
+            percent = 100.0 if expected_bars == 0 else min(100.0, round(downloaded_bars / expected_bars * 100, 1))
+            on_progress(
+                DownloadProgress(
+                    symbol=symbol.upper(),
+                    interval=interval,
+                    start_ms=int(start_ms),
+                    end_ms=int(end_ms),
+                    cursor_ms=cursor,
+                    downloaded_bars=downloaded_bars,
+                    expected_bars=expected_bars,
+                    percent=percent,
+                )
+            )
     if not rows:
         return pd.DataFrame(columns=COLUMNS)
     return pd.concat(rows, ignore_index=True).drop_duplicates(subset=["timestamp", "symbol", "market", "interval"])

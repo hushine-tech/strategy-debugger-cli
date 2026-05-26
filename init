@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE="${HUSHINE_DEBUG_WORKSPACE:-$HOME/hushine-debug-workspace}"
+PYTHON_BIN="${PYTHON:-python3}"
+STRATEGY_LIBRARY_DIR="${HUSHINE_STRATEGY_LIBRARY_DIR:-$ROOT_DIR/../strategy-library}"
+STRATEGY_LIBRARY_GIT="${HUSHINE_STRATEGY_LIBRARY_GIT:-git+https://github.com/hushine-tech/strategy-library.git}"
+
+"$PYTHON_BIN" - <<'PY'
+import sys
+if sys.version_info < (3, 11):
+    raise SystemExit("Python 3.11+ is required")
+PY
+
+mkdir -p "$WORKSPACE"
+
+# Uses python -m venv through the configured Python executable.
+"$PYTHON_BIN" -m venv "$WORKSPACE/.venv"
+"$WORKSPACE/.venv/bin/python" -m pip install -U pip
+
+if [ -d "$STRATEGY_LIBRARY_DIR" ]; then
+  "$WORKSPACE/.venv/bin/python" -m pip install -e "$STRATEGY_LIBRARY_DIR"
+else
+  "$WORKSPACE/.venv/bin/python" -m pip install "$STRATEGY_LIBRARY_GIT"
+fi
+
+"$WORKSPACE/.venv/bin/python" -m pip install -e "$ROOT_DIR"
+"$WORKSPACE/.venv/bin/python" -m hushine_debugger.cli init --dir "$WORKSPACE" --with-demo
+
+(
+  cd "$WORKSPACE"
+  "$WORKSPACE/.venv/bin/python" -m hushine_debugger.cli replay
+)
+
+echo
+echo "Demo completed"
+echo
+echo "Next:"
+echo "1. cd $WORKSPACE"
+echo "2. code ."
+echo "3. Open strategy.py and set breakpoints"
+echo "4. Run \"Hushine Local Replay\" in VSCode Debug"
+echo "5. Edit hushine-debug.yaml to change symbol, interval, or date range"
