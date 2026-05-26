@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+STRATEGY_LIBRARY_PACKAGE = "hushine-strategy-library"
+
 
 def _default_workspace() -> Path:
     return Path(os.environ.get("HUSHINE_DEBUG_WORKSPACE", Path.home() / "hushine-debug-workspace")).expanduser()
@@ -23,6 +25,15 @@ def _run(args: list[str | Path], *, cwd: Path | None = None) -> None:
     subprocess.run([str(item) for item in args], cwd=cwd, check=True)
 
 
+def _editable_requirement(source: str, package_name: str) -> str:
+    if not source.startswith(("git+", "hg+", "svn+", "bzr+")):
+        return source
+    if "#egg=" in source or "&egg=" in source:
+        return source
+    separator = "&" if "#" in source else "#"
+    return f"{source}{separator}egg={package_name}"
+
+
 def _strategy_library_source(root: Path) -> str:
     configured = os.environ.get("HUSHINE_STRATEGY_LIBRARY_DIR")
     if configured:
@@ -32,10 +43,11 @@ def _strategy_library_source(root: Path) -> str:
     sibling = root.parent / "strategy-library"
     if sibling.exists():
         return str(sibling)
-    return os.environ.get(
+    source = os.environ.get(
         "HUSHINE_STRATEGY_LIBRARY_GIT",
         "git+https://github.com/hushine-tech/strategy-library.git",
     )
+    return _editable_requirement(source, STRATEGY_LIBRARY_PACKAGE)
 
 
 def bootstrap(workspace: Path) -> None:

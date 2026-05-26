@@ -1,10 +1,21 @@
 import json
+import importlib.util
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 from hushine_debugger.cli import main
+
+
+def _load_repo_init_script():
+    script = Path(__file__).resolve().parents[1] / "init.py"
+    spec = importlib.util.spec_from_file_location("hushine_debugger_repo_init", script)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_version_command(capsys):
@@ -137,3 +148,30 @@ def test_cross_platform_init_py_exists():
     assert "\"bin\"" in text
     assert "\"hushine_debugger.cli\"" in text
     assert "Demo completed" in text
+
+
+def test_init_py_git_strategy_library_source_has_editable_name(tmp_path, monkeypatch):
+    init_script = _load_repo_init_script()
+    root = tmp_path / "strategy-debugger-cli"
+    root.mkdir()
+    monkeypatch.delenv("HUSHINE_STRATEGY_LIBRARY_DIR", raising=False)
+    monkeypatch.delenv("HUSHINE_STRATEGY_LIBRARY_GIT", raising=False)
+
+    source = init_script._strategy_library_source(root)
+
+    assert source == "git+https://github.com/hushine-tech/strategy-library.git#egg=hushine-strategy-library"
+
+
+def test_init_py_preserves_configured_git_fragment_and_adds_egg(tmp_path, monkeypatch):
+    init_script = _load_repo_init_script()
+    root = tmp_path / "strategy-debugger-cli"
+    root.mkdir()
+    monkeypatch.delenv("HUSHINE_STRATEGY_LIBRARY_DIR", raising=False)
+    monkeypatch.setenv(
+        "HUSHINE_STRATEGY_LIBRARY_GIT",
+        "git+https://example.invalid/strategy-library.git#subdirectory=python",
+    )
+
+    source = init_script._strategy_library_source(root)
+
+    assert source == "git+https://example.invalid/strategy-library.git#subdirectory=python&egg=hushine-strategy-library"
