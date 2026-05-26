@@ -1,0 +1,13 @@
+strategy_file: strategy.py
+strategy_profile: base-futures-v1
+exchange: binance
+market: futures
+symbol: BTCUSDT
+interval: 1m
+start: "2025-01-01T00:00:00Z"
+end: "2025-02-01T00:00:00Z"
+data_source_order:
+  - bundled
+  - imports
+  - cache
+download_if_missing: true

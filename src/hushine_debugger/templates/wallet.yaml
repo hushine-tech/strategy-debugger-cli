@@ -1,0 +1,5 @@
+market: futures
+asset: USDT
+initial_balance: 1000.0
+margin_mode: cross
+position_mode: one_way

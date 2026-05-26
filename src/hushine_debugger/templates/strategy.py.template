@@ -1,0 +1,32 @@
+from __future__ import annotations
+
+from hushine_strategy import OrderDecision
+
+
+class MyStrategy:
+    INPUTS = [
+        {"market": "futures", "symbol": "BTCUSDT", "interval": "1m"},
+    ]
+
+    def __init__(self) -> None:
+        self.grid_step = 0.01
+        self.order_qty = 0.001
+        self.reference_price = None
+
+    def on_market_data(self, data, wallet):
+        tick = data.market["futures"].symbol["BTCUSDT"].interval["1m"]
+        if tick is None:
+            return None
+        price = float(tick.price)
+        if self.reference_price is None:
+            self.reference_price = price
+            self.notify.info(f"reference price initialized at {price}", title="GridStrategy")
+            return None
+        change = (price - self.reference_price) / self.reference_price
+        if change <= -self.grid_step:
+            self.reference_price = price
+            return OrderDecision(symbol="BTCUSDT", side="LONG", qty=self.order_qty, market="futures")
+        if change >= self.grid_step:
+            self.reference_price = price
+            return OrderDecision(symbol="BTCUSDT", side="SHORT", qty=self.order_qty, market="futures")
+        return None
