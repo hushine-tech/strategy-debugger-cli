@@ -38,7 +38,7 @@ def main() -> int:
             raise SystemExit(f"{symbol}: unexpected last timestamp {int(timestamps.max())}")
         target = root / symbol / "klines.parquet"
         target.parent.mkdir(parents=True, exist_ok=True)
-        frame.to_parquet(target, index=False, compression="zstd")
+        frame.to_parquet(target, index=False, compression="snappy", version="2.4")
         print(f"Wrote {target} ({len(frame)} bars)", flush=True)
     return 0
 

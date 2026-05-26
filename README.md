@@ -12,12 +12,28 @@ The default workspace includes:
 
 ## First Run
 
-Clone this repository and run the bootstrap script:
+Clone this repository and run the bootstrap script.
+
+macOS / Linux:
 
 ```bash
 git clone git@github.com:hushine-tech/strategy-debugger-cli.git
 cd strategy-debugger-cli
 ./init
+```
+
+Windows PowerShell:
+
+```powershell
+git clone git@github.com:hushine-tech/strategy-debugger-cli.git
+cd strategy-debugger-cli
+py init.py
+```
+
+Cross-platform explicit form:
+
+```bash
+python init.py
 ```
 
 The script creates `~/hushine-debug-workspace`, installs dependencies into
@@ -116,7 +132,7 @@ From the cloned repository:
 ```bash
 cd strategy-debugger-cli
 git pull
-./init
+python init.py
 ```
 
 `./init` is idempotent. It updates the venv and managed files without

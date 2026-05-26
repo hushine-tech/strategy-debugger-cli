@@ -124,7 +124,16 @@ def test_repo_init_script_exists():
 
     assert script.exists()
     text = script.read_text(encoding="utf-8")
-    assert "python -m venv" in text
-    assert "pip install" in text
-    assert "hushine_debugger.cli" in text
+    assert "init.py" in text
+
+
+def test_cross_platform_init_py_exists():
+    script = Path(__file__).resolve().parents[1] / "init.py"
+
+    assert script.exists()
+    text = script.read_text(encoding="utf-8")
+    assert "os.name == \"nt\"" in text
+    assert "\"Scripts\"" in text
+    assert "\"bin\"" in text
+    assert "\"hushine_debugger.cli\"" in text
     assert "Demo completed" in text
