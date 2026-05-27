@@ -270,7 +270,37 @@ git pull
 py init.py
 ```
 
-初始化脚本是幂等的，会更新虚拟环境和模板，不会覆盖已有 `strategy.py`。
+初始化脚本是幂等的，会通过 `uv` 更新工作区虚拟环境和模板，不会覆盖已有 `strategy.py`。
+
+如果本机还没有安装 `uv`，先执行：
+
+Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+macOS / Linux:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+如果之前初始化失败留下了半成品虚拟环境，可以只删除工作区里的 `.venv` 后重新运行：
+
+macOS / Linux:
+
+```bash
+rm -rf ~/hushine-debug-workspace/.venv
+python init.py
+```
+
+Windows PowerShell:
+
+```powershell
+Remove-Item -Recurse -Force $HOME\hushine-debug-workspace\.venv
+py init.py
+```
 
 ## 删除工具
 
