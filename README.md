@@ -313,3 +313,25 @@ Windows PowerShell:
 Remove-Item -Recurse -Force $HOME\hushine-debug-workspace
 Remove-Item -Recurse -Force .\strategy-debugger-cli
 ```
+
+## 常见问题
+
+### `Editable must refer to a local directory, not a Git URL`
+
+这是旧版本初始化脚本的问题：它把远程 `strategy-library` Git URL 当成 editable 依赖安装了，而 `uv` 只允许本地目录使用 editable。
+
+先更新 CLI 仓库，再删除半成品 `.venv` 后重新初始化：
+
+```bash
+git pull
+rm -rf ~/hushine-debug-workspace/.venv
+uv run --no-project --python 3.13 python init.py
+```
+
+Windows Git Bash:
+
+```bash
+git pull
+rm -rf ~/hushine-debug-workspace/.venv
+uv run --no-project --python 3.13 python init.py
+```

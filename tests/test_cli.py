@@ -155,7 +155,7 @@ def test_cross_platform_init_py_exists():
     assert "uv" in text
 
 
-def test_init_py_git_strategy_library_source_has_editable_name(tmp_path, monkeypatch):
+def test_init_py_git_strategy_library_source_defaults_to_github(tmp_path, monkeypatch):
     init_script = _load_repo_init_script()
     root = tmp_path / "strategy-debugger-cli"
     root.mkdir()
@@ -164,10 +164,10 @@ def test_init_py_git_strategy_library_source_has_editable_name(tmp_path, monkeyp
 
     source = init_script._strategy_library_source(root)
 
-    assert source == "git+https://github.com/hushine-tech/strategy-library.git#egg=hushine-strategy-library"
+    assert source == "git+https://github.com/hushine-tech/strategy-library.git"
 
 
-def test_init_py_preserves_configured_git_fragment_and_adds_egg(tmp_path, monkeypatch):
+def test_init_py_preserves_configured_git_fragment_for_direct_url_install(tmp_path, monkeypatch):
     init_script = _load_repo_init_script()
     root = tmp_path / "strategy-debugger-cli"
     root.mkdir()
@@ -177,9 +177,25 @@ def test_init_py_preserves_configured_git_fragment_and_adds_egg(tmp_path, monkey
         "git+https://example.invalid/strategy-library.git#subdirectory=python",
     )
 
-    source = init_script._strategy_library_source(root)
+    args = init_script._strategy_library_install_args(root)
 
-    assert source == "git+https://example.invalid/strategy-library.git#subdirectory=python&egg=hushine-strategy-library"
+    assert args == [
+        "hushine-strategy-library @ git+https://example.invalid/strategy-library.git#subdirectory=python",
+    ]
+
+
+def test_init_py_installs_git_strategy_library_without_editable_flag(tmp_path, monkeypatch):
+    init_script = _load_repo_init_script()
+    root = tmp_path / "strategy-debugger-cli"
+    root.mkdir()
+    monkeypatch.delenv("HUSHINE_STRATEGY_LIBRARY_DIR", raising=False)
+    monkeypatch.delenv("HUSHINE_STRATEGY_LIBRARY_GIT", raising=False)
+
+    args = init_script._strategy_library_install_args(root)
+
+    assert args == [
+        "hushine-strategy-library @ git+https://github.com/hushine-tech/strategy-library.git",
+    ]
 
 
 def test_init_py_requires_uv(monkeypatch):

@@ -55,13 +55,22 @@ def _uv_executable() -> str:
     raise SystemExit(UV_INSTALL_MESSAGE)
 
 
-def _editable_requirement(source: str, package_name: str) -> str:
-    if not source.startswith(("git+", "hg+", "svn+", "bzr+")):
+def _is_vcs_source(source: str) -> bool:
+    return source.startswith(("git+", "hg+", "svn+", "bzr+"))
+
+
+def _remove_egg_fragment(source: str) -> str:
+    if "#" not in source:
         return source
-    if "#egg=" in source or "&egg=" in source:
-        return source
-    separator = "&" if "#" in source else "#"
-    return f"{source}{separator}egg={package_name}"
+    base, fragment = source.split("#", 1)
+    parts = [part for part in fragment.split("&") if not part.startswith("egg=")]
+    if not parts:
+        return base
+    return f"{base}#{'&'.join(parts)}"
+
+
+def _direct_url_requirement(source: str, package_name: str) -> str:
+    return f"{package_name} @ {_remove_egg_fragment(source)}"
 
 
 def _strategy_library_source(root: Path) -> str:
@@ -77,7 +86,14 @@ def _strategy_library_source(root: Path) -> str:
         "HUSHINE_STRATEGY_LIBRARY_GIT",
         "git+https://github.com/hushine-tech/strategy-library.git",
     )
-    return _editable_requirement(source, STRATEGY_LIBRARY_PACKAGE)
+    return source
+
+
+def _strategy_library_install_args(root: Path) -> list[str]:
+    source = _strategy_library_source(root)
+    if _is_vcs_source(source):
+        return [_direct_url_requirement(source, STRATEGY_LIBRARY_PACKAGE)]
+    return ["-e", source]
 
 
 def bootstrap(workspace: Path) -> None:
@@ -90,7 +106,7 @@ def bootstrap(workspace: Path) -> None:
     python = _venv_python(workspace)
 
     _run([uv, "venv", "--python", sys.executable, workspace / ".venv"])
-    _run([uv, "pip", "install", "--python", python, "-e", _strategy_library_source(root), "-e", root])
+    _run([uv, "pip", "install", "--python", python, *_strategy_library_install_args(root), "-e", root])
     _run([python, "-m", "hushine_debugger.cli", "init", "--dir", workspace, "--with-demo"])
     _run([python, "-m", "hushine_debugger.cli", "replay"], cwd=workspace)
 
