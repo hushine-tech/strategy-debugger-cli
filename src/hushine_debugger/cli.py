@@ -62,6 +62,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         result = import_debug_package(args.package, Path("."))
         print(f"imported {result.symbol} {result.market} {result.interval} -> {result.parquet_path}")
+        print(f'Update strategy.py: set SYMBOL = "{result.symbol}" before replaying this package.')
         return 0
     if args.command == "validate":
         from hushine_strategy.validator import validate_strategy_code

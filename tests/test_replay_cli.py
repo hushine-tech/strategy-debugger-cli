@@ -214,6 +214,7 @@ def test_import_command_unpacks_debug_package(tmp_path: Path, monkeypatch, capsy
     captured = capsys.readouterr()
     assert code == 0
     assert "imported ETHUSDT futures 1m" in captured.out
+    assert 'Update strategy.py: set SYMBOL = "ETHUSDT"' in captured.out
     assert (workspace / "strategy.py").read_text(encoding="utf-8") == "user strategy should survive\n"
     assert "symbol: ETHUSDT" in (workspace / "hushine-debug.yaml").read_text(encoding="utf-8")
     assert "data_source_order:\n- imports" in (workspace / "hushine-debug.yaml").read_text(encoding="utf-8")

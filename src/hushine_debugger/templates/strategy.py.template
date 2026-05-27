@@ -4,8 +4,14 @@ from hushine_strategy import OrderDecision
 
 
 class MyStrategy:
+    # If you import an ETH/SOL/etc. debug package or edit hushine-debug.yaml,
+    # change SYMBOL here to the same value so breakpoints and orders hit the loaded data.
+    MARKET = "futures"
+    SYMBOL = "BTCUSDT"
+    INTERVAL = "1m"
+
     INPUTS = [
-        {"market": "futures", "symbol": "BTCUSDT", "interval": "1m"},
+        {"market": MARKET, "symbol": SYMBOL, "interval": INTERVAL},
     ]
 
     def __init__(self) -> None:
@@ -14,7 +20,7 @@ class MyStrategy:
         self.reference_price = None
 
     def on_market_data(self, data, wallet):
-        tick = data.market["futures"].symbol["BTCUSDT"].interval["1m"]
+        tick = data.market[self.MARKET].symbol[self.SYMBOL].interval[self.INTERVAL]
         if tick is None:
             return None
         price = float(tick.price)
@@ -25,8 +31,8 @@ class MyStrategy:
         change = (price - self.reference_price) / self.reference_price
         if change <= -self.grid_step:
             self.reference_price = price
-            return OrderDecision(symbol="BTCUSDT", side="LONG", qty=self.order_qty, market="futures")
+            return OrderDecision(symbol=self.SYMBOL, side="LONG", qty=self.order_qty, market=self.MARKET)
         if change >= self.grid_step:
             self.reference_price = price
-            return OrderDecision(symbol="BTCUSDT", side="SHORT", qty=self.order_qty, market="futures")
+            return OrderDecision(symbol=self.SYMBOL, side="SHORT", qty=self.order_qty, market=self.MARKET)
         return None

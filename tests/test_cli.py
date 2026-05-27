@@ -35,6 +35,9 @@ def test_init_command_creates_workspace(tmp_path, capsys):
     assert f"initialized {workspace}" in captured.out
     assert (workspace / "strategy.py").exists()
     assert (workspace / "strategy.py.template").exists()
+    strategy_template = (workspace / "strategy.py.template").read_text(encoding="utf-8")
+    assert 'SYMBOL = "BTCUSDT"' in strategy_template
+    assert "change SYMBOL" in strategy_template
     assert (workspace / ".vscode" / "launch.json").exists()
     launch = json.loads((workspace / ".vscode" / "launch.json").read_text(encoding="utf-8"))
     config = launch["configurations"][0]

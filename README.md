@@ -102,6 +102,13 @@ cd $HOME\hushine-debug-workspace
 code .
 ```
 
+Windows Git Bash:
+
+```bash
+cd ~/hushine-debug-workspace
+code .
+```
+
 然后：
 
 1. 打开 `strategy.py`
@@ -192,7 +199,42 @@ cd $HOME\hushine-debug-workspace
 .\.venv\Scripts\hushine-debug replay
 ```
 
+Windows Git Bash:
+
+```bash
+cd ~/hushine-debug-workspace
+./.venv/Scripts/hushine-debug import ~/Downloads/debug-package.zip
+./.venv/Scripts/hushine-debug replay
+```
+
 导入后也可以直接在 VSCode 里点击 `Hushine Local Replay`。
+
+### 导入 ETH / 其他币种后修改策略
+
+`hushine-debug import` 会更新 `hushine-debug.yaml` 和本地数据，但不会覆盖用户自己的 `strategy.py`。
+
+如果下载的是 `ETHUSDT`，需要打开 `strategy.py`，把模板顶部的常量改成和数据包一致：
+
+```python
+class MyStrategy:
+    MARKET = "futures"
+    SYMBOL = "ETHUSDT"
+    INTERVAL = "1m"
+```
+
+模板后面已经统一使用这三个常量：
+
+```python
+INPUTS = [
+    {"market": MARKET, "symbol": SYMBOL, "interval": INTERVAL},
+]
+
+tick = data.market[self.MARKET].symbol[self.SYMBOL].interval[self.INTERVAL]
+
+return OrderDecision(symbol=self.SYMBOL, side="LONG", qty=self.order_qty, market=self.MARKET)
+```
+
+所以正常情况下只需要改 `SYMBOL`。如果你下载的是不同 interval，例如 `5m`，再同步改 `INTERVAL`。如果 `strategy.py` 里还有手写的 `"BTCUSDT"`，也要一并替换，否则 replay 读的是 ETH 数据，策略却在等 BTC tick，断点可能进不到预期分支。
 
 ## 常用命令
 
@@ -212,6 +254,13 @@ cd $HOME\hushine-debug-workspace
 .\.venv\Scripts\hushine-debug replay
 ```
 
+Windows Git Bash:
+
+```bash
+cd ~/hushine-debug-workspace
+./.venv/Scripts/hushine-debug replay
+```
+
 ### 校验策略
 
 macOS / Linux:
@@ -224,6 +273,12 @@ Windows PowerShell:
 
 ```powershell
 .\.venv\Scripts\hushine-debug validate strategy.py
+```
+
+Windows Git Bash:
+
+```bash
+./.venv/Scripts/hushine-debug validate strategy.py
 ```
 
 校验会拦截危险 import 和不支持的策略写法。
@@ -240,6 +295,12 @@ Windows PowerShell:
 
 ```powershell
 .\.venv\Scripts\hushine-debug repair --dir .
+```
+
+Windows Git Bash:
+
+```bash
+./.venv/Scripts/hushine-debug repair --dir .
 ```
 
 它会恢复受管理模板文件，不会覆盖：
