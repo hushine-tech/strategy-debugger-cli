@@ -138,6 +138,8 @@ def test_repo_init_script_exists():
     assert script.exists()
     text = script.read_text(encoding="utf-8")
     assert "init.py" in text
+    assert "uv" in text
+    assert "--no-project" in text
 
 
 def test_cross_platform_init_py_exists():

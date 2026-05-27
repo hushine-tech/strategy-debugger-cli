@@ -18,7 +18,7 @@ Install uv first:
     curl -LsSf https://astral.sh/uv/install.sh | sh
 
 Then rerun:
-  python init.py
+  uv run --no-project --python 3.13 python init.py
 """
 
 
