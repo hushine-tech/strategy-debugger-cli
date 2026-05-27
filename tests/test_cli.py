@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from hushine_debugger.cli import main
 
 
@@ -148,6 +150,7 @@ def test_cross_platform_init_py_exists():
     assert "\"bin\"" in text
     assert "\"hushine_debugger.cli\"" in text
     assert "Demo completed" in text
+    assert "uv" in text
 
 
 def test_init_py_git_strategy_library_source_has_editable_name(tmp_path, monkeypatch):
@@ -175,3 +178,60 @@ def test_init_py_preserves_configured_git_fragment_and_adds_egg(tmp_path, monkey
     source = init_script._strategy_library_source(root)
 
     assert source == "git+https://example.invalid/strategy-library.git#subdirectory=python&egg=hushine-strategy-library"
+
+
+def test_init_py_requires_uv(monkeypatch):
+    init_script = _load_repo_init_script()
+    monkeypatch.delenv("UV", raising=False)
+    monkeypatch.setattr(init_script.shutil, "which", lambda _name: None)
+
+    with pytest.raises(SystemExit) as exc:
+        init_script._uv_executable()
+
+    assert "uv is required" in str(exc.value)
+
+
+def test_bootstrap_uses_uv_for_environment_install(tmp_path, monkeypatch):
+    init_script = _load_repo_init_script()
+    calls = []
+    workspace = tmp_path / "workspace"
+    root = Path(init_script.__file__).resolve().parent
+
+    monkeypatch.setattr(init_script, "_uv_executable", lambda: "uv")
+    monkeypatch.setattr(init_script, "_strategy_library_source", lambda _root: "strategy-library-source")
+
+    def fake_run(args, *, cwd=None):
+        calls.append(([str(item) for item in args], cwd))
+
+    monkeypatch.setattr(init_script, "_run", fake_run)
+
+    init_script.bootstrap(workspace)
+
+    assert calls[0][0] == ["uv", "venv", "--python", sys.executable, str(workspace / ".venv")]
+    assert calls[1][0] == [
+        "uv",
+        "pip",
+        "install",
+        "--python",
+        str(init_script._venv_python(workspace)),
+        "-e",
+        "strategy-library-source",
+        "-e",
+        str(root),
+    ]
+    assert calls[2][0] == [
+        str(init_script._venv_python(workspace)),
+        "-m",
+        "hushine_debugger.cli",
+        "init",
+        "--dir",
+        str(workspace),
+        "--with-demo",
+    ]
+    assert calls[3][0] == [
+        str(init_script._venv_python(workspace)),
+        "-m",
+        "hushine_debugger.cli",
+        "replay",
+    ]
+    assert calls[3][1] == workspace

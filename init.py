@@ -2,11 +2,24 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 STRATEGY_LIBRARY_PACKAGE = "hushine-strategy-library"
+UV_INSTALL_MESSAGE = """uv is required to initialize the Hushine debugger workspace.
+
+Install uv first:
+  Windows PowerShell:
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+  macOS/Linux:
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+Then rerun:
+  python init.py
+"""
 
 
 def _default_workspace() -> Path:
@@ -23,6 +36,23 @@ def _run(args: list[str | Path], *, cwd: Path | None = None) -> None:
     printable = " ".join(str(item) for item in args)
     print(f"$ {printable}", flush=True)
     subprocess.run([str(item) for item in args], cwd=cwd, check=True)
+
+
+def _uv_executable() -> str:
+    configured = os.environ.get("UV")
+    if configured:
+        resolved = shutil.which(configured)
+        if resolved:
+            return resolved
+        path = Path(configured).expanduser()
+        if path.exists():
+            return str(path)
+        raise SystemExit(f"UV={configured} was set but the executable was not found.")
+
+    uv = shutil.which("uv")
+    if uv:
+        return uv
+    raise SystemExit(UV_INSTALL_MESSAGE)
 
 
 def _editable_requirement(source: str, package_name: str) -> str:
@@ -56,12 +86,11 @@ def bootstrap(workspace: Path) -> None:
         raise SystemExit("Python 3.11+ is required")
 
     workspace.mkdir(parents=True, exist_ok=True)
+    uv = _uv_executable()
     python = _venv_python(workspace)
 
-    _run([sys.executable, "-m", "venv", workspace / ".venv"])
-    _run([python, "-m", "pip", "install", "-U", "pip"])
-    _run([python, "-m", "pip", "install", "-e", _strategy_library_source(root)])
-    _run([python, "-m", "pip", "install", "-e", root])
+    _run([uv, "venv", "--python", sys.executable, workspace / ".venv"])
+    _run([uv, "pip", "install", "--python", python, "-e", _strategy_library_source(root), "-e", root])
     _run([python, "-m", "hushine_debugger.cli", "init", "--dir", workspace, "--with-demo"])
     _run([python, "-m", "hushine_debugger.cli", "replay"], cwd=workspace)
 
