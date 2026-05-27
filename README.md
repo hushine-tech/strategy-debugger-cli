@@ -335,3 +335,18 @@ git pull
 rm -rf ~/hushine-debug-workspace/.venv
 uv run --no-project --python 3.13 python init.py
 ```
+
+### VSCode: `Couldn't spawn debuggee: [WinError 2]`
+
+这通常是旧版 `.vscode/launch.json` 在 Windows 下解释器路径不正确。更新 CLI 后，在工作区修复模板：
+
+Windows Git Bash:
+
+```bash
+cd ~/strategy-debugger-cli
+git pull
+cd ~/hushine-debug-workspace
+.venv/Scripts/hushine-debug repair --dir .
+```
+
+然后重新打开 VSCode，选择 `Hushine Local Replay` 再点 Debug。

@@ -39,6 +39,8 @@ def test_init_command_creates_workspace(tmp_path, capsys):
     launch = json.loads((workspace / ".vscode" / "launch.json").read_text(encoding="utf-8"))
     config = launch["configurations"][0]
     assert config["python"] == "${workspaceFolder}/.venv/bin/python"
+    assert config["windows"]["python"] == "${workspaceFolder}/.venv/Scripts/python.exe"
+    assert config["cwd"] == "${workspaceFolder}"
     assert config["module"] == "hushine_debugger.cli"
     assert config["args"] == ["replay"]
     assert (workspace / "data" / "bundled").exists()
