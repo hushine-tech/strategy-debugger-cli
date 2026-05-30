@@ -1,17 +1,21 @@
 from __future__ import annotations
 
-from hushine_strategy import OrderDecision
+from hushine_strategy import Exchange, Market, OrderDecision, OrderSide, OrderType, PositionSide
 
 
 class MyStrategy:
     # If you import an ETH/SOL/etc. debug package or edit hushine-debug.yaml,
     # change SYMBOL here to the same value so breakpoints and orders hit the loaded data.
-    MARKET = "futures"
+    EXCHANGE = Exchange.BINANCE
+    MARKET = Market.PERPETUAL_FUTURES
     SYMBOL = "BTCUSDT"
     INTERVAL = "1m"
 
     INPUTS = [
-        {"market": MARKET, "symbol": SYMBOL, "interval": INTERVAL},
+        {"exchange": EXCHANGE, "market": MARKET, "symbol": SYMBOL, "interval": INTERVAL},
+    ]
+    ORDER_TARGETS = [
+        {"exchange": EXCHANGE, "market": MARKET, "symbol": SYMBOL},
     ]
 
     def __init__(self) -> None:
@@ -20,7 +24,7 @@ class MyStrategy:
         self.reference_price = None
 
     def on_market_data(self, data, wallet):
-        tick = data.market[self.MARKET].symbol[self.SYMBOL].interval[self.INTERVAL]
+        tick = data.exchange[self.EXCHANGE][self.MARKET].symbol[self.SYMBOL].interval[self.INTERVAL]
         if tick is None:
             return None
         price = float(tick.price)
@@ -31,8 +35,24 @@ class MyStrategy:
         change = (price - self.reference_price) / self.reference_price
         if change <= -self.grid_step:
             self.reference_price = price
-            return OrderDecision(symbol=self.SYMBOL, side="LONG", qty=self.order_qty, market=self.MARKET)
+            return OrderDecision(
+                exchange=self.EXCHANGE,
+                market=self.MARKET,
+                symbol=self.SYMBOL,
+                side=OrderSide.BUY,
+                qty=str(self.order_qty),
+                order_type=OrderType.MARKET,
+                position_side=PositionSide.BOTH,
+            )
         if change >= self.grid_step:
             self.reference_price = price
-            return OrderDecision(symbol=self.SYMBOL, side="SHORT", qty=self.order_qty, market=self.MARKET)
+            return OrderDecision(
+                exchange=self.EXCHANGE,
+                market=self.MARKET,
+                symbol=self.SYMBOL,
+                side=OrderSide.SELL,
+                qty=str(self.order_qty),
+                order_type=OrderType.MARKET,
+                position_side=PositionSide.BOTH,
+            )
         return None

@@ -12,6 +12,9 @@ import yaml
 from hushine_debugger.init_workspace import init_workspace, write_manifest
 
 
+DEFAULT_MARKET = "perpetual_futures"
+
+
 @dataclass(frozen=True)
 class ImportResult:
     parquet_path: Path
@@ -61,7 +64,7 @@ def import_debug_package(package_path: str | Path, root: str | Path = ".") -> Im
             raise ValueError("debug package is missing data.parquet")
         manifest = _read_manifest(archive)
         symbol = str(manifest.get("symbol") or "BTCUSDT").upper()
-        market = str(manifest.get("market") or "futures").lower()
+        market = str(manifest.get("market") or DEFAULT_MARKET).lower()
         interval = str(manifest.get("interval") or "1m")
         if "wallet.yaml" in names:
             (workspace / "wallet.yaml").write_text(_read_zip_text(archive, "wallet.yaml"), encoding="utf-8")

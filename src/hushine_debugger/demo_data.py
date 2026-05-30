@@ -6,7 +6,7 @@ from pathlib import Path
 
 DEFAULT_SYMBOLS = ("BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT")
 DEFAULT_EXCHANGE = "binance"
-DEFAULT_MARKET = "futures"
+DEFAULT_MARKET = "perpetual_futures"
 DEFAULT_INTERVAL = "1m"
 
 

@@ -13,6 +13,9 @@ from hushine_debugger.downloader.binance_futures import download_klines, interva
 from hushine_debugger.integrity import check_workspace_integrity
 
 
+DEFAULT_MARKET = "perpetual_futures"
+
+
 @dataclass(frozen=True)
 class LocalReplayResult:
     bars_processed: int
@@ -40,7 +43,7 @@ def _load_or_download_klines(workspace: Path, cfg):
     except (FileNotFoundError, DataCoverageError):
         if cfg.data_files or not cfg.download_if_missing:
             raise
-        if cfg.exchange != "binance" or cfg.market != "futures":
+        if cfg.exchange != "binance" or cfg.market != DEFAULT_MARKET:
             raise
         if cfg.start_time_ms is None or cfg.end_time_ms is None:
             raise FileNotFoundError("missing local data and config start/end are required for download")

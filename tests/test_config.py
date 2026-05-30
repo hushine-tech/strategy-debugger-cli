@@ -5,7 +5,7 @@ def test_load_config_parses_time_bool_and_single_source_order(tmp_path):
     (tmp_path / "hushine-debug.yaml").write_text(
         "strategy_file: strategy.py\n"
         "exchange: binance\n"
-        "market: futures\n"
+        "market: perpetual_futures\n"
         "symbol: ethusdt\n"
         "interval: 1m\n"
         "start: '2025-01-01T00:00:00Z'\n"

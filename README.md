@@ -67,13 +67,13 @@ uv run --no-project --python 3.13 python init.py --workspace ~/hushine-debug-wor
 3. 通过 `uv pip install` 安装 CLI 和依赖
 4. 生成 `strategy.py`
 5. 复制内置 demo 数据
-6. 运行默认 `BTCUSDT futures 1m` 回测
+6. 运行默认 `BTCUSDT perpetual_futures 1m` 回测
 7. 输出进度、成交数量、盈亏和收益率
 
 正常输出会包含类似内容：
 
 ```text
-Running backtest BTCUSDT futures 1m
+Running backtest BTCUSDT perpetual_futures 1m
 Progress: 10% (4464/44640 bars)
 ...
 Progress: 100% (44640/44640 bars)
@@ -216,8 +216,12 @@ cd ~/hushine-debug-workspace
 如果下载的是 `ETHUSDT`，需要打开 `strategy.py`，把模板顶部的常量改成和数据包一致：
 
 ```python
+from hushine_strategy import Exchange, Market, OrderDecision, OrderSide, OrderType, PositionSide
+
+
 class MyStrategy:
-    MARKET = "futures"
+    EXCHANGE = Exchange.BINANCE
+    MARKET = Market.PERPETUAL_FUTURES
     SYMBOL = "ETHUSDT"
     INTERVAL = "1m"
 ```
@@ -226,12 +230,23 @@ class MyStrategy:
 
 ```python
 INPUTS = [
-    {"market": MARKET, "symbol": SYMBOL, "interval": INTERVAL},
+    {"exchange": EXCHANGE, "market": MARKET, "symbol": SYMBOL, "interval": INTERVAL},
+]
+ORDER_TARGETS = [
+    {"exchange": EXCHANGE, "market": MARKET, "symbol": SYMBOL},
 ]
 
-tick = data.market[self.MARKET].symbol[self.SYMBOL].interval[self.INTERVAL]
+tick = data.exchange[self.EXCHANGE][self.MARKET].symbol[self.SYMBOL].interval[self.INTERVAL]
 
-return OrderDecision(symbol=self.SYMBOL, side="LONG", qty=self.order_qty, market=self.MARKET)
+return OrderDecision(
+    exchange=self.EXCHANGE,
+    market=self.MARKET,
+    symbol=self.SYMBOL,
+    side=OrderSide.BUY,
+    qty=str(self.order_qty),
+    order_type=OrderType.MARKET,
+    position_side=PositionSide.BOTH,
+)
 ```
 
 所以正常情况下只需要改 `SYMBOL`。如果你下载的是不同 interval，例如 `5m`，再同步改 `INTERVAL`。如果 `strategy.py` 里还有手写的 `"BTCUSDT"`，也要一并替换，否则 replay 读的是 ETH 数据，策略却在等 BTC tick，断点可能进不到预期分支。

@@ -9,6 +9,7 @@ import requests
 
 
 BASE_URL = "https://fapi.binance.com/fapi/v1/klines"
+MARKET = "perpetual_futures"
 COLUMNS = ["timestamp", "open", "high", "low", "close", "volume", "symbol", "market", "interval"]
 
 
@@ -58,7 +59,7 @@ def parse_klines(raw: list[list], *, symbol: str, interval: str) -> pd.DataFrame
                 "close": float(item[4]),
                 "volume": float(item[5]),
                 "symbol": symbol.upper(),
-                "market": "futures",
+                "market": MARKET,
                 "interval": interval,
             }
         )
@@ -122,7 +123,7 @@ def download_klines(
 
 
 def save_to_cache(root: str | Path, df: pd.DataFrame, *, symbol: str, interval: str) -> Path:
-    target = Path(root) / "data" / "cache" / "binance" / "futures" / interval / symbol.upper()
+    target = Path(root) / "data" / "cache" / "binance" / MARKET / interval / symbol.upper()
     target.mkdir(parents=True, exist_ok=True)
     path = target / "klines.parquet"
     frames = [df]

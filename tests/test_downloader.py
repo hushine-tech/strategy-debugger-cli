@@ -9,7 +9,7 @@ def test_parse_binance_klines_to_dataframe():
     assert df.iloc[0]["timestamp"] == 1735689600000
     assert df.iloc[0]["close"] == 100.5
     assert df.iloc[0]["symbol"] == "BTCUSDT"
-    assert df.iloc[0]["market"] == "futures"
+    assert df.iloc[0]["market"] == "perpetual_futures"
 
 
 class _FakeResponse:
@@ -83,14 +83,14 @@ def test_save_to_cache_writes_parquet(tmp_path):
                 "close": 100.0,
                 "volume": 10.0,
                 "symbol": "BTCUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             }
         ]
     )
     path = save_to_cache(tmp_path, df, symbol="BTCUSDT", interval="1m")
     assert path.exists()
-    assert path.relative_to(tmp_path).as_posix() == "data/cache/binance/futures/1m/BTCUSDT/klines.parquet"
+    assert path.relative_to(tmp_path).as_posix() == "data/cache/binance/perpetual_futures/1m/BTCUSDT/klines.parquet"
 
 
 def test_save_to_cache_merges_existing_rows(tmp_path):
@@ -104,7 +104,7 @@ def test_save_to_cache_merges_existing_rows(tmp_path):
                 "close": 100.0,
                 "volume": 10.0,
                 "symbol": "BTCUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             }
         ]
@@ -119,7 +119,7 @@ def test_save_to_cache_merges_existing_rows(tmp_path):
                 "close": 100.0,
                 "volume": 10.0,
                 "symbol": "BTCUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             },
             {
@@ -130,7 +130,7 @@ def test_save_to_cache_merges_existing_rows(tmp_path):
                 "close": 101.0,
                 "volume": 11.0,
                 "symbol": "BTCUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             },
         ]

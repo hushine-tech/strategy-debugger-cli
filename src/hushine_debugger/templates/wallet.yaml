@@ -1,4 +1,4 @@
-market: futures
+market: perpetual_futures
 asset: USDT
 initial_balance: 1000.0
 margin_mode: cross

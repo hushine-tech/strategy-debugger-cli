@@ -14,7 +14,7 @@ def _write_minimal_workspace(root: Path) -> None:
     (root / "hushine-debug.yaml").write_text(
         "strategy_file: strategy.py\n"
         "exchange: binance\n"
-        "market: futures\n"
+        "market: perpetual_futures\n"
         "symbol: BTCUSDT\n"
         "interval: 1m\n"
         "start: '2025-01-01T00:00:00Z'\n"
@@ -39,7 +39,7 @@ def _write_minimal_workspace(root: Path) -> None:
                 "close": 100.0,
                 "volume": 10.0,
                 "symbol": "BTCUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             },
             {
@@ -50,7 +50,7 @@ def _write_minimal_workspace(root: Path) -> None:
                 "close": 99.0,
                 "volume": 11.0,
                 "symbol": "BTCUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             },
         ]
@@ -63,7 +63,7 @@ def _write_pnl_workspace(root: Path) -> None:
     (root / "hushine-debug.yaml").write_text(
         "strategy_file: strategy.py\n"
         "exchange: binance\n"
-        "market: futures\n"
+        "market: perpetual_futures\n"
         "symbol: TESTUSDT\n"
         "interval: 1m\n"
         "start: '2025-03-01T00:00:00Z'\n"
@@ -74,15 +74,16 @@ def _write_pnl_workspace(root: Path) -> None:
         encoding="utf-8",
     )
     (root / "strategy.py").write_text(
-        "from hushine_strategy import OrderDecision\n\n"
+        "from hushine_strategy import Exchange, Market, OrderDecision, OrderSide, OrderType, PositionSide\n\n"
         "class MyStrategy:\n"
-        "    INPUTS = [{'market': 'futures', 'symbol': 'TESTUSDT', 'interval': '1m'}]\n"
+        "    INPUTS = [{'exchange': Exchange.BINANCE, 'market': Market.PERPETUAL_FUTURES, 'symbol': 'TESTUSDT', 'interval': '1m'}]\n"
+        "    ORDER_TARGETS = [{'exchange': Exchange.BINANCE, 'market': Market.PERPETUAL_FUTURES, 'symbol': 'TESTUSDT'}]\n"
         "    def __init__(self):\n"
         "        self.done = False\n"
         "    def on_market_data(self, data, wallet):\n"
         "        if not self.done:\n"
         "            self.done = True\n"
-        "            return OrderDecision(symbol='TESTUSDT', side='LONG', qty=1, market='futures')\n"
+        "            return OrderDecision(exchange=Exchange.BINANCE, market=Market.PERPETUAL_FUTURES, symbol='TESTUSDT', side=OrderSide.BUY, qty='1', order_type=OrderType.MARKET, position_side=PositionSide.BOTH)\n"
         "        return None\n",
         encoding="utf-8",
     )
@@ -96,7 +97,7 @@ def _write_pnl_workspace(root: Path) -> None:
                 "close": 100.0,
                 "volume": 10.0,
                 "symbol": "TESTUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             },
             {
@@ -107,7 +108,7 @@ def _write_pnl_workspace(root: Path) -> None:
                 "close": 110.0,
                 "volume": 11.0,
                 "symbol": "TESTUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             },
         ]
@@ -154,7 +155,7 @@ def test_replay_command_outputs_progress_and_pnl_summary(tmp_path: Path, monkeyp
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "Running backtest TESTUSDT futures 1m" in captured.out
+    assert "Running backtest TESTUSDT perpetual_futures 1m" in captured.out
     assert "Progress: 100%" in captured.out
     assert "Initial balance: 1000.00 USDT" in captured.out
     assert "Final equity: 1010.00 USDT" in captured.out
@@ -186,8 +187,8 @@ def test_import_command_unpacks_debug_package(tmp_path: Path, monkeypatch, capsy
     package_path = tmp_path / "debug-package.zip"
     _write_debug_package(
         package_path,
-        manifest="exchange: binance\nmarket: futures\nsymbol: ETHUSDT\ninterval: 1m\n",
-        wallet="market: futures\nasset: USDT\ninitial_balance: 2500\n",
+        manifest="exchange: binance\nmarket: perpetual_futures\nsymbol: ETHUSDT\ninterval: 1m\n",
+        wallet="market: perpetual_futures\nasset: USDT\ninitial_balance: 2500\n",
         source=pd.DataFrame(
             [
                 {
@@ -213,7 +214,7 @@ def test_import_command_unpacks_debug_package(tmp_path: Path, monkeypatch, capsy
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "imported ETHUSDT futures 1m" in captured.out
+    assert "imported ETHUSDT perpetual_futures 1m" in captured.out
     assert 'Update strategy.py: set SYMBOL = "ETHUSDT"' in captured.out
     assert (workspace / "strategy.py").read_text(encoding="utf-8") == "user strategy should survive\n"
     assert "symbol: ETHUSDT" in (workspace / "hushine-debug.yaml").read_text(encoding="utf-8")
@@ -224,7 +225,7 @@ def test_import_command_unpacks_debug_package(tmp_path: Path, monkeypatch, capsy
     imported = pd.read_parquet(next((workspace / "data" / "imports").glob("*.parquet")))
     assert imported.iloc[0]["timestamp"] == 1735689600000
     assert imported.iloc[0]["symbol"] == "ETHUSDT"
-    assert imported.iloc[0]["market"] == "futures"
+    assert imported.iloc[0]["market"] == "perpetual_futures"
     assert imported.iloc[0]["interval"] == "1m"
 
 
@@ -233,8 +234,8 @@ def test_replay_after_multiple_imports_uses_latest_package_file_only(tmp_path: P
     second_package = tmp_path / "second.zip"
     _write_debug_package(
         first_package,
-        manifest="exchange: binance\nmarket: futures\nsymbol: BTCUSDT\ninterval: 1m\n",
-        wallet="market: futures\nasset: USDT\ninitial_balance: 1000\n",
+        manifest="exchange: binance\nmarket: perpetual_futures\nsymbol: BTCUSDT\ninterval: 1m\n",
+        wallet="market: perpetual_futures\nasset: USDT\ninitial_balance: 1000\n",
         source=pd.DataFrame(
             [
                 {"timestamp_ms": 1735689600000, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0, "volume": 10.0},
@@ -244,8 +245,8 @@ def test_replay_after_multiple_imports_uses_latest_package_file_only(tmp_path: P
     )
     _write_debug_package(
         second_package,
-        manifest="exchange: binance\nmarket: futures\nsymbol: BTCUSDT\ninterval: 1m\n",
-        wallet="market: futures\nasset: USDT\ninitial_balance: 1000\n",
+        manifest="exchange: binance\nmarket: perpetual_futures\nsymbol: BTCUSDT\ninterval: 1m\n",
+        wallet="market: perpetual_futures\nasset: USDT\ninitial_balance: 1000\n",
         source=pd.DataFrame(
             [
                 {"timestamp_ms": 1735689720000, "open": 102.0, "high": 103.0, "low": 101.0, "close": 102.0, "volume": 12.0},
@@ -255,8 +256,10 @@ def test_replay_after_multiple_imports_uses_latest_package_file_only(tmp_path: P
     workspace = tmp_path / "workspace"
     init_workspace(workspace)
     (workspace / "strategy.py").write_text(
+        "from hushine_strategy import Exchange, Market\n"
         "class MyStrategy:\n"
-        "    INPUTS = [{'market': 'futures', 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    INPUTS = [{'exchange': Exchange.BINANCE, 'market': Market.PERPETUAL_FUTURES, 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    ORDER_TARGETS = []\n"
         "    def on_market_data(self, data, wallet):\n"
         "        return None\n",
         encoding="utf-8",
@@ -276,15 +279,16 @@ def test_replay_after_multiple_imports_uses_latest_package_file_only(tmp_path: P
 def test_replay_uses_first_matching_data_source_only(tmp_path: Path):
     init_workspace(tmp_path)
     (tmp_path / "strategy.py").write_text(
-        "from hushine_strategy import OrderDecision\n\n"
+        "from hushine_strategy import Exchange, Market\n"
         "class MyStrategy:\n"
-        "    INPUTS = [{'market': 'futures', 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    INPUTS = [{'exchange': Exchange.BINANCE, 'market': Market.PERPETUAL_FUTURES, 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    ORDER_TARGETS = []\n"
         "    def on_market_data(self, data, wallet):\n"
         "        return None\n",
         encoding="utf-8",
     )
     (tmp_path / "hushine-debug.yaml").write_text(
-        "strategy_file: strategy.py\nmarket: futures\nsymbol: BTCUSDT\ninterval: 1m\ndata_source_order:\n  - imports\n  - bundled\n",
+        "strategy_file: strategy.py\nmarket: perpetual_futures\nsymbol: BTCUSDT\ninterval: 1m\ndata_source_order:\n  - imports\n  - bundled\n",
         encoding="utf-8",
     )
     bundled = pd.DataFrame(
@@ -297,7 +301,7 @@ def test_replay_uses_first_matching_data_source_only(tmp_path: Path):
                 "close": 100.0,
                 "volume": 10.0,
                 "symbol": "BTCUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             }
         ]
@@ -314,15 +318,17 @@ def test_replay_uses_first_matching_data_source_only(tmp_path: Path):
 def test_replay_filters_configured_time_range(tmp_path: Path):
     init_workspace(tmp_path)
     (tmp_path / "strategy.py").write_text(
+        "from hushine_strategy import Exchange, Market\n"
         "class MyStrategy:\n"
-        "    INPUTS = [{'market': 'futures', 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    INPUTS = [{'exchange': Exchange.BINANCE, 'market': Market.PERPETUAL_FUTURES, 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    ORDER_TARGETS = []\n"
         "    def on_market_data(self, data, wallet):\n"
         "        return None\n",
         encoding="utf-8",
     )
     (tmp_path / "hushine-debug.yaml").write_text(
         "strategy_file: strategy.py\n"
-        "market: futures\n"
+        "market: perpetual_futures\n"
         "symbol: BTCUSDT\n"
         "interval: 1m\n"
         "start: '2025-01-01T00:01:00Z'\n"
@@ -342,7 +348,7 @@ def test_replay_filters_configured_time_range(tmp_path: Path):
                 "close": 100.0,
                 "volume": 10.0,
                 "symbol": "BTCUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             }
         )
@@ -356,8 +362,10 @@ def test_replay_filters_configured_time_range(tmp_path: Path):
 def test_replay_downloads_missing_binance_futures_data(tmp_path: Path, monkeypatch, capsys):
     init_workspace(tmp_path)
     (tmp_path / "strategy.py").write_text(
+        "from hushine_strategy import Exchange, Market\n"
         "class MyStrategy:\n"
-        "    INPUTS = [{'market': 'futures', 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    INPUTS = [{'exchange': Exchange.BINANCE, 'market': Market.PERPETUAL_FUTURES, 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    ORDER_TARGETS = []\n"
         "    def on_market_data(self, data, wallet):\n"
         "        return None\n",
         encoding="utf-8",
@@ -365,7 +373,7 @@ def test_replay_downloads_missing_binance_futures_data(tmp_path: Path, monkeypat
     (tmp_path / "hushine-debug.yaml").write_text(
         "strategy_file: strategy.py\n"
         "exchange: binance\n"
-        "market: futures\n"
+        "market: perpetual_futures\n"
         "symbol: BTCUSDT\n"
         "interval: 1m\n"
         "start: '2025-01-01T00:00:00Z'\n"
@@ -398,7 +406,7 @@ def test_replay_downloads_missing_binance_futures_data(tmp_path: Path, monkeypat
                     "close": 100.0,
                     "volume": 10.0,
                     "symbol": "BTCUSDT",
-                    "market": "futures",
+                    "market": "perpetual_futures",
                     "interval": "1m",
                 },
                 {
@@ -409,7 +417,7 @@ def test_replay_downloads_missing_binance_futures_data(tmp_path: Path, monkeypat
                     "close": 101.0,
                     "volume": 11.0,
                     "symbol": "BTCUSDT",
-                    "market": "futures",
+                    "market": "perpetual_futures",
                     "interval": "1m",
                 },
             ]
@@ -421,16 +429,18 @@ def test_replay_downloads_missing_binance_futures_data(tmp_path: Path, monkeypat
 
     captured = capsys.readouterr()
     assert result.bars_processed == 2
-    assert "Local data missing, downloading BTCUSDT futures 1m" in captured.out
+    assert "Local data missing, downloading BTCUSDT perpetual_futures 1m" in captured.out
     assert "Download completed" in captured.out
-    assert (tmp_path / "data" / "cache" / "binance" / "futures" / "1m" / "BTCUSDT" / "klines.parquet").exists()
+    assert (tmp_path / "data" / "cache" / "binance" / "perpetual_futures" / "1m" / "BTCUSDT" / "klines.parquet").exists()
 
 
 def test_replay_downloads_when_local_cache_has_partial_range(tmp_path: Path, monkeypatch):
     init_workspace(tmp_path)
     (tmp_path / "strategy.py").write_text(
+        "from hushine_strategy import Exchange, Market\n"
         "class MyStrategy:\n"
-        "    INPUTS = [{'market': 'futures', 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    INPUTS = [{'exchange': Exchange.BINANCE, 'market': Market.PERPETUAL_FUTURES, 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    ORDER_TARGETS = []\n"
         "    def on_market_data(self, data, wallet):\n"
         "        return None\n",
         encoding="utf-8",
@@ -438,7 +448,7 @@ def test_replay_downloads_when_local_cache_has_partial_range(tmp_path: Path, mon
     (tmp_path / "hushine-debug.yaml").write_text(
         "strategy_file: strategy.py\n"
         "exchange: binance\n"
-        "market: futures\n"
+        "market: perpetual_futures\n"
         "symbol: BTCUSDT\n"
         "interval: 1m\n"
         "start: '2025-01-01T00:00:00Z'\n"
@@ -458,12 +468,12 @@ def test_replay_downloads_when_local_cache_has_partial_range(tmp_path: Path, mon
                 "close": 100.0,
                 "volume": 10.0,
                 "symbol": "BTCUSDT",
-                "market": "futures",
+                "market": "perpetual_futures",
                 "interval": "1m",
             }
         ]
     )
-    cache_path = tmp_path / "data" / "cache" / "binance" / "futures" / "1m" / "BTCUSDT"
+    cache_path = tmp_path / "data" / "cache" / "binance" / "perpetual_futures" / "1m" / "BTCUSDT"
     cache_path.mkdir(parents=True)
     partial.to_parquet(cache_path / "klines.parquet")
 
@@ -478,7 +488,7 @@ def test_replay_downloads_when_local_cache_has_partial_range(tmp_path: Path, mon
                     "close": 100.0 + i,
                     "volume": 10.0 + i,
                     "symbol": symbol,
-                    "market": "futures",
+                    "market": "perpetual_futures",
                     "interval": interval,
                 }
                 for i in range(3)
@@ -497,8 +507,10 @@ def test_replay_downloads_when_local_cache_has_partial_range(tmp_path: Path, mon
 def test_replay_uses_later_complete_cache_when_bundled_is_partial(tmp_path: Path, monkeypatch):
     init_workspace(tmp_path)
     (tmp_path / "strategy.py").write_text(
+        "from hushine_strategy import Exchange, Market\n"
         "class MyStrategy:\n"
-        "    INPUTS = [{'market': 'futures', 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    INPUTS = [{'exchange': Exchange.BINANCE, 'market': Market.PERPETUAL_FUTURES, 'symbol': 'BTCUSDT', 'interval': '1m'}]\n"
+        "    ORDER_TARGETS = []\n"
         "    def on_market_data(self, data, wallet):\n"
         "        return None\n",
         encoding="utf-8",
@@ -506,7 +518,7 @@ def test_replay_uses_later_complete_cache_when_bundled_is_partial(tmp_path: Path
     (tmp_path / "hushine-debug.yaml").write_text(
         "strategy_file: strategy.py\n"
         "exchange: binance\n"
-        "market: futures\n"
+        "market: perpetual_futures\n"
         "symbol: BTCUSDT\n"
         "interval: 1m\n"
         "start: '2025-01-01T00:00:00Z'\n"
@@ -526,13 +538,13 @@ def test_replay_uses_later_complete_cache_when_bundled_is_partial(tmp_path: Path
             "close": 100.0 + i,
             "volume": 10.0 + i,
             "symbol": "BTCUSDT",
-            "market": "futures",
+            "market": "perpetual_futures",
             "interval": "1m",
         }
         for i in range(3)
     ]
     pd.DataFrame(rows[:1]).to_parquet(tmp_path / "data" / "bundled" / "partial.parquet")
-    cache_dir = tmp_path / "data" / "cache" / "binance" / "futures" / "1m" / "BTCUSDT"
+    cache_dir = tmp_path / "data" / "cache" / "binance" / "perpetual_futures" / "1m" / "BTCUSDT"
     cache_dir.mkdir(parents=True)
     pd.DataFrame(rows).to_parquet(cache_dir / "klines.parquet")
 
@@ -550,7 +562,7 @@ def test_packaged_default_data_contains_required_symbols():
     from importlib.resources import files
 
     required = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
-    root = files("hushine_debugger.assets.default_data") / "binance" / "futures" / "1m"
+    root = files("hushine_debugger.assets.default_data") / "binance" / "perpetual_futures" / "1m"
     for symbol in required:
         path = root / symbol / "klines.parquet"
         assert path.is_file(), symbol

@@ -1,7 +1,7 @@
 strategy_file: strategy.py
-strategy_profile: base-futures-v1
+strategy_profile: base-perpetual-futures-v1
 exchange: binance
-market: futures
+market: perpetual_futures
 symbol: BTCUSDT
 interval: 1m
 start: "2025-01-01T00:00:00Z"

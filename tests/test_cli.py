@@ -38,6 +38,12 @@ def test_init_command_creates_workspace(tmp_path, capsys):
     strategy_template = (workspace / "strategy.py.template").read_text(encoding="utf-8")
     assert 'SYMBOL = "BTCUSDT"' in strategy_template
     assert "change SYMBOL" in strategy_template
+    assert "Exchange.BINANCE" in strategy_template
+    assert "Market.PERPETUAL_FUTURES" in strategy_template
+    assert "ORDER_TARGETS" in strategy_template
+    assert "data.exchange" in strategy_template
+    assert 'MARKET = "futures"' not in strategy_template
+    assert "data.market" not in strategy_template
     assert (workspace / ".vscode" / "launch.json").exists()
     launch = json.loads((workspace / ".vscode" / "launch.json").read_text(encoding="utf-8"))
     config = launch["configurations"][0]
@@ -79,10 +85,11 @@ def test_validate_command_accepts_clean_strategy(tmp_path, capsys):
     strategy = tmp_path / "strategy.py"
     strategy.write_text(
         """
-from hushine_strategy import OrderDecision
+from hushine_strategy import Exchange, Market
 
 class MyStrategy:
-    INPUTS = [{"market": "futures", "symbol": "BTCUSDT", "interval": "1m"}]
+    INPUTS = [{"exchange": Exchange.BINANCE, "market": Market.PERPETUAL_FUTURES, "symbol": "BTCUSDT", "interval": "1m"}]
+    ORDER_TARGETS = []
 
     def on_market_data(self, data, wallet):
         return None
@@ -104,7 +111,8 @@ def test_validate_command_rejects_forbidden_import(tmp_path, capsys):
 import requests
 
 class MyStrategy:
-    INPUTS = [{"market": "futures", "symbol": "BTCUSDT", "interval": "1m"}]
+    INPUTS = [{"exchange": "binance", "market": "perpetual_futures", "symbol": "BTCUSDT", "interval": "1m"}]
+    ORDER_TARGETS = []
 
     def on_market_data(self, data, wallet):
         return None

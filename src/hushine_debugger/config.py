@@ -8,6 +8,9 @@ from typing import Any
 import yaml
 
 
+DEFAULT_MARKET = "perpetual_futures"
+
+
 @dataclass(frozen=True)
 class DebugConfig:
     strategy_file: str
@@ -64,7 +67,7 @@ def load_config(root: str | Path) -> DebugConfig:
         strategy_file=str(data.get("strategy_file") or "strategy.py"),
         exchange=str(data.get("exchange") or "binance").lower(),
         symbol=str(data.get("symbol") or "BTCUSDT").upper(),
-        market=str(data.get("market") or "futures").lower(),
+        market=str(data.get("market") or DEFAULT_MARKET).lower(),
         interval=str(data.get("interval") or "1m"),
         start=start,
         end=end,
